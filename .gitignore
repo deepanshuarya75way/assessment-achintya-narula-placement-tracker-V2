@@ -1,0 +1,9 @@
+data/
+.test-tmp/
+.env
+node_modules/
+*.log
+
+# Local AI editor configuration
+.agent/
+.antigravity/

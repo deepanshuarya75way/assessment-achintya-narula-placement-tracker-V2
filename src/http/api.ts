@@ -5,6 +5,8 @@ import { extname, resolve, sep } from 'node:path';
 import { createApplication, applicationStatuses, updateApplication, type ApplicationStatus } from '../domain/application.ts';
 import { hashPassword, signToken, verifyPassword, verifyToken, type TokenClaims } from '../domain/auth.ts';
 import { buildDueReminders } from '../domain/reminders.ts';
+import { createInterviewRound, InterviewValidationError } from '../domain/interview.ts';
+import { buildInterviewCalendar } from '../domain/calendar.ts';
 import { JsonStore } from '../store/json-store.ts';
 
 interface ApiOptions {
@@ -116,6 +118,14 @@ function passwordFrom(body: Record<string, unknown>): string {
   return body.password;
 }
 
+function decodeId(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    throw new HttpError(400, 'INVALID_PATH', 'Path contains invalid encoding');
+  }
+}
+
 export function createApiServer(options: ApiOptions): Server {
   const now = options.now ?? (() => new Date());
 
@@ -168,6 +178,74 @@ export function createApiServer(options: ApiOptions): Server {
 
       const claims = bearer(request, options.jwtSecret, now());
 
+      if (method === 'GET' && url.pathname === '/api/interviews/agenda') {
+        const days = url.searchParams.get('days') ?? '7';
+        if (days !== '7' && days !== 'all') {
+          throw new HttpError(400, 'VALIDATION_ERROR', 'Agenda days must be 7 or all');
+        }
+        json(response, 200, { interviewRounds: await options.store.listInterviewAgenda(
+          claims.sub, now(), days === 'all' ? null : 7,
+        ) });
+        return;
+      }
+
+      const interviewMatch = url.pathname.match(
+        /^\/api\/applications\/([^/]+)\/interviews(?:\/([^/]+)(\/calendar\.ics)?)?$/,
+      );
+      if (interviewMatch) {
+        const applicationId = decodeId(interviewMatch[1]);
+        const roundId = interviewMatch[2] ? decodeId(interviewMatch[2]) : undefined;
+        const calendar = Boolean(interviewMatch[3]);
+        const application = await options.store.getApplication(claims.sub, applicationId);
+        if (!application) throw new HttpError(404, 'NOT_FOUND', 'Application not found');
+
+        if (!roundId && method === 'GET') {
+          json(response, 200, { application,
+            interviewRounds: await options.store.listInterviewRounds(claims.sub, applicationId) });
+          return;
+        }
+        if (!roundId && method === 'POST') {
+          const input = await readJson(request);
+          const created = createInterviewRound(input, claims.sub, applicationId, now());
+          const interviewRound = await options.store.addInterviewRound(claims.sub, created);
+          if (!interviewRound) throw new HttpError(404, 'NOT_FOUND', 'Application not found');
+          json(response, 201, { interviewRound });
+          return;
+        }
+        if (roundId && !calendar && method === 'PATCH') {
+          const input = await readJson(request);
+          const interviewRound = await options.store.updateInterviewRound(claims.sub, applicationId, roundId, input, now());
+          if (!interviewRound) throw new HttpError(404, 'NOT_FOUND', 'Interview round not found');
+          json(response, 200, { interviewRound });
+          return;
+        }
+        if (roundId && !calendar && method === 'DELETE') {
+          if (!await options.store.deleteInterviewRound(claims.sub, applicationId, roundId)) {
+            throw new HttpError(404, 'NOT_FOUND', 'Interview round not found');
+          }
+          json(response, 204);
+          return;
+        }
+        if (roundId && method === 'GET') {
+          const rounds = await options.store.listInterviewRounds(claims.sub, applicationId);
+          const interviewRound = rounds.find((round) => round.id === roundId);
+          if (!interviewRound) throw new HttpError(404, 'NOT_FOUND', 'Interview round not found');
+          if (calendar) {
+            response.statusCode = 200;
+            response.setHeader('content-type', 'text/calendar; charset=utf-8');
+            response.setHeader('content-disposition', `attachment; filename="interview-${encodeURIComponent(roundId)}.ics"`);
+            response.setHeader('cache-control', 'no-store');
+            response.setHeader('x-content-type-options', 'nosniff');
+            response.end(buildInterviewCalendar(interviewRound, application, now()));
+          } else {
+            json(response, 200, { interviewRound });
+          }
+          return;
+        }
+        response.setHeader('allow', calendar ? 'GET' : roundId ? 'GET, PATCH, DELETE' : 'GET, POST');
+        throw new HttpError(405, 'METHOD_NOT_ALLOWED', 'Method is not supported for this route');
+      }
+
       if (method === 'GET' && url.pathname === '/api/applications') {
         const rawStatus = url.searchParams.get('status');
         if (rawStatus && !applicationStatuses.includes(rawStatus as ApplicationStatus)) {
@@ -217,7 +295,7 @@ export function createApiServer(options: ApiOptions): Server {
 
       const match = url.pathname.match(/^\/api\/applications\/([^/]+)$/);
       if (match) {
-        const id = decodeURIComponent(match[1]);
+        const id = decodeId(match[1]);
         const existing = await options.store.getApplication(claims.sub, id);
         if (!existing) throw new HttpError(404, 'NOT_FOUND', 'Application not found');
 
@@ -248,6 +326,10 @@ export function createApiServer(options: ApiOptions): Server {
     } catch (error) {
       if (error instanceof HttpError) {
         json(response, error.status, { error: { code: error.code, message: error.message } });
+        return;
+      }
+      if (error instanceof InterviewValidationError) {
+        json(response, 400, { error: { code: 'VALIDATION_ERROR', message: error.message } });
         return;
       }
       json(response, 500, { error: { code: 'INTERNAL_ERROR', message: 'An unexpected error occurred' } });

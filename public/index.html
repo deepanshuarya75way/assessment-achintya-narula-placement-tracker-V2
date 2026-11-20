@@ -53,6 +53,19 @@
           <article><strong id="stat-offers">0</strong><span>Offers</span></article>
         </div>
 
+        <section class="agenda-panel" aria-labelledby="agenda-title">
+          <div class="panel-heading">
+            <div><p class="eyebrow">YOUR NEXT CONVERSATION</p><h2 id="agenda-title">Interview agenda</h2></div>
+            <div class="agenda-controls">
+              <label><span class="sr-only">Interview agenda range</span><select id="agenda-range"><option value="7">Next 7 days</option><option value="all">All upcoming</option></select></label>
+              <button id="refresh-agenda" class="button button-quiet" type="button">Refresh agenda</button>
+            </div>
+          </div>
+          <p class="field-hint">Upcoming rounds, in order. Interviews within the next 7 days are highlighted. <span class="timezone-label"></span></p>
+          <p id="agenda-message" class="form-message" role="status"></p>
+          <div id="agenda-list" class="agenda-list"><p class="empty">No interviews scheduled in the next 7 days.</p></div>
+        </section>
+
         <div class="dashboard-grid">
           <section class="applications-panel">
             <div class="toolbar">
@@ -100,6 +113,60 @@
       </form>
     </dialog>
 
+    <dialog id="interview-dialog" aria-labelledby="interview-dialog-title">
+      <div class="interview-dialog-content">
+        <div class="dialog-heading">
+          <div><p class="eyebrow" id="interview-company"></p><h2 id="interview-dialog-title">Interview rounds</h2><p id="interview-role" class="field-hint"></p></div>
+          <button id="close-interviews" class="icon-button" type="button" aria-label="Close interview rounds">×</button>
+        </div>
+        <p class="field-hint timezone-label"></p>
+        <p id="interview-message" class="form-message" role="status"></p>
+        <button id="refresh-rounds" class="button button-small button-quiet" type="button">Refresh rounds</button>
+        <div id="round-list" class="round-list"></div>
+        <p id="closed-application-note" class="field-hint hidden">This application is closed. You can review rounds and record debrief notes.</p>
+        <form id="round-form">
+          <fieldset class="dialog-section">
+            <legend id="round-form-title">Schedule an interview round</legend>
+            <div class="form-grid">
+              <label>Round type<input name="roundType" list="round-types" required maxlength="200" placeholder="e.g. Technical"></label>
+              <datalist id="round-types"><option value="Technical"><option value="HR"><option value="System Design"><option value="Managerial"></datalist>
+              <label>Interviewer name<input name="interviewerName" required maxlength="200"></label>
+              <label>Date<input name="date" type="date" required></label>
+              <label>Time<input name="time" type="time" required></label>
+              <label>Duration (minutes)<input name="durationMinutes" type="number" min="1" max="480" step="1" value="60" required></label>
+            </div>
+            <p class="field-hint">Calendar downloads include a reminder 15 minutes before the interview.</p>
+            <p id="round-form-message" class="form-message" role="status"></p>
+            <div class="dialog-actions"><button id="cancel-round-edit" class="button button-quiet hidden" type="button">Cancel edit</button><button id="round-submit" class="button button-primary" type="submit">Schedule round</button></div>
+          </fieldset>
+        </form>
+      </div>
+    </dialog>
+
+    <template id="interview-round-template">
+      <article class="round-card">
+        <div class="card-top"><h3 class="round-type"></h3><span class="status-pill round-status"></span></div>
+        <p class="round-start"></p><p class="round-interviewer field-hint"></p>
+        <p class="round-notes saved-note hidden"></p><p class="round-salary saved-note hidden"></p>
+        <div class="card-actions">
+          <button class="button button-small button-quiet download-calendar" type="button">Download .ics</button>
+          <button class="button button-small button-quiet reschedule-round" type="button">Edit schedule</button>
+          <button class="button button-small button-danger delete-round" type="button">Delete round</button>
+        </div>
+        <p class="round-message form-message" role="status"></p>
+        <details class="round-feedback">
+          <summary>Record or edit debrief</summary>
+          <form class="feedback-form">
+            <label>Round result<select name="status"><option value="COMPLETED">Completed</option><option value="PASSED">Passed</option></select></label>
+            <label>Debrief notes<textarea name="feedbackNotes" rows="3" maxlength="5000"></textarea></label>
+            <label>Salary insights<textarea name="salaryInsights" rows="2" maxlength="5000" placeholder="Optional salary range or discussion notes"></textarea></label>
+            <button class="button button-small button-primary" type="submit">Save feedback</button>
+          </form>
+        </details>
+        <p class="feedback-locked field-hint">Debrief opens after the scheduled end time. Use Refresh rounds to update availability.</p>
+      </article>
+    </template>
+
     <template id="application-template">
       <article class="application-card">
         <div class="card-top"><div><h3 class="application-role"></h3><p class="application-company"></p></div><span class="status-pill"></span></div>
@@ -111,7 +178,7 @@
         </dl>
         <p class="application-notes hidden"></p>
         <a class="application-link hidden" target="_blank" rel="noopener noreferrer">View job posting ↗</a>
-        <div class="card-actions"><button class="button button-small button-quiet edit-button" type="button">Edit</button><button class="button button-small advance-button" type="button"></button><button class="button button-small button-danger reject-button" type="button">Reject</button><button class="button button-small button-quiet delete-button" type="button">Delete</button></div>
+        <div class="card-actions"><button class="button button-small button-quiet edit-button" type="button">Edit</button><button class="button button-small button-quiet interviews-button" type="button">Interview rounds</button><button class="button button-small advance-button" type="button"></button><button class="button button-small button-danger reject-button" type="button">Reject</button><button class="button button-small button-quiet delete-button" type="button">Delete</button></div>
       </article>
     </template>
     <script type="module" src="/app.js"></script>

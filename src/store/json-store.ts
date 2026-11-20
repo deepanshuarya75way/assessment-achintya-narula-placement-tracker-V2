@@ -2,6 +2,13 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 import { normalizeStoredApplication, type ApplicationStatus, type JobApplication } from '../domain/application.ts';
+import {
+  updateInterviewRound as applyInterviewUpdate,
+  InterviewValidationError,
+  type InterviewPatch,
+  type InterviewRound,
+} from '../domain/interview.ts';
+import { buildInterviewAgenda, type InterviewAgendaItem } from '../domain/agenda.ts';
 
 export interface UserRecord {
   id: string;
@@ -23,9 +30,15 @@ interface Database {
   users: UserRecord[];
   applications: JobApplication[];
   reminders: ReminderRecord[];
+  interviewRounds: InterviewRound[];
 }
 
-const emptyDatabase = (): Database => ({ users: [], applications: [], reminders: [] });
+const emptyDatabase = (): Database => ({
+  users: [],
+  applications: [],
+  reminders: [],
+  interviewRounds: [],
+});
 
 export class JsonStore {
   readonly #file: string;
@@ -53,6 +66,9 @@ export class JsonStore {
         ? parsed.applications.map((application) => normalizeStoredApplication(application))
         : [],
       reminders: Array.isArray(parsed.reminders) ? parsed.reminders : [],
+      interviewRounds: Array.isArray(parsed.interviewRounds)
+        ? parsed.interviewRounds
+        : [],
     };
   }
 
@@ -141,6 +157,112 @@ export class JsonStore {
       if (index === -1) return false;
       database.applications.splice(index, 1);
       database.reminders = database.reminders.filter((reminder) => reminder.applicationId !== id);
+      database.interviewRounds = database.interviewRounds.filter(
+        (round) =>
+          round.applicationId !== id ||
+          round.userId !== userId,
+      );
+      return true;
+    });
+  }
+
+  async addInterviewRound(
+    userId: string,
+    round: InterviewRound,
+  ): Promise<InterviewRound | undefined> {
+    return this.#mutate((database) => {
+      const application = database.applications.find(
+        (item) =>
+          item.id === round.applicationId &&
+          item.userId === userId,
+      );
+
+      if (!application || round.userId !== userId) {
+        return undefined;
+      }
+
+      if (['OFFER', 'REJECTED'].includes(application.status)) {
+        throw new InterviewValidationError('Cannot schedule interviews for a closed application');
+      }
+
+      if (database.interviewRounds.some((item) => item.id === round.id)) {
+        throw new InterviewValidationError('Interview round already exists');
+      }
+
+      database.interviewRounds.push(round);
+      return round;
+    });
+  }
+
+  async listInterviewRounds(
+    userId: string,
+    applicationId: string,
+  ): Promise<InterviewRound[]> {
+    const database = await this.#read();
+
+    return database.interviewRounds
+      .filter(
+        (round) =>
+          round.userId === userId &&
+          round.applicationId === applicationId,
+      )
+      .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  }
+
+  async updateInterviewRound(
+    userId: string,
+    applicationId: string,
+    roundId: string,
+    patch: InterviewPatch,
+    now = new Date(),
+  ): Promise<InterviewRound | undefined> {
+    return this.#mutate((database) => {
+      const application = database.applications.find(
+        (item) =>
+          item.id === applicationId &&
+          item.userId === userId,
+      );
+
+      if (!application) return undefined;
+
+      const rescheduling = ['roundType', 'startsAt', 'durationMinutes', 'interviewerName']
+        .some((key) => Object.hasOwn(patch, key));
+      if (rescheduling && ['OFFER', 'REJECTED'].includes(application.status)) {
+        throw new InterviewValidationError('Cannot reschedule interviews for a closed application');
+      }
+
+      const index = database.interviewRounds.findIndex(
+        (round) =>
+          round.id === roundId &&
+          round.applicationId === applicationId &&
+          round.userId === userId,
+      );
+
+      if (index === -1) return undefined;
+
+      const updated = applyInterviewUpdate(
+        database.interviewRounds[index],
+        patch,
+        now,
+      );
+
+      database.interviewRounds[index] = updated;
+      return updated;
+    });
+  }
+
+  async listInterviewAgenda(userId: string, now = new Date(), days: number | null = 7): Promise<InterviewAgendaItem[]> {
+    const database = await this.#read();
+    return buildInterviewAgenda(database.applications, database.interviewRounds, userId, now, days);
+  }
+
+  async deleteInterviewRound(userId: string, applicationId: string, roundId: string): Promise<boolean> {
+    return this.#mutate((database) => {
+      if (!database.applications.some((item) => item.id === applicationId && item.userId === userId)) return false;
+      const index = database.interviewRounds.findIndex((round) =>
+        round.id === roundId && round.applicationId === applicationId && round.userId === userId);
+      if (index === -1) return false;
+      database.interviewRounds.splice(index, 1);
       return true;
     });
   }

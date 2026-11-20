@@ -4,6 +4,7 @@ import {
   completeApplicationSubmission,
 } from './application-form.js';
 import { applicationPresentation } from './application-view.js';
+import { setupInterviews } from './interviews.js';
 
 const state = {
   token: sessionStorage.getItem('placement-token'),
@@ -13,6 +14,7 @@ const state = {
 };
 const stages = ['SAVED', 'APPLIED', 'ASSESSMENT', 'INTERVIEW', 'OFFER'];
 const byId = (id) => document.getElementById(id);
+const interviews = setupInterviews({ api, getToken: () => state.token });
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -166,6 +168,7 @@ function renderApplications() {
     if (['OFFER', 'REJECTED'].includes(application.status)) reject.remove();
     else reject.addEventListener('click', () => changeStatus(application.id, 'REJECTED'));
     card.querySelector('.edit-button').addEventListener('click', () => openEditDialog(application));
+    card.querySelector('.interviews-button').addEventListener('click', () => interviews.open(application.id));
     card.querySelector('.delete-button').addEventListener('click', () => removeApplication(application.id));
     list.append(card);
   }
@@ -185,17 +188,18 @@ async function loadApplications() {
 async function changeStatus(id, status) {
   try {
     await api(`/api/applications/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ status }) });
-    await Promise.all([loadApplications(), loadReminders(true)]);
+    await Promise.all([loadApplications(), loadReminders(true), interviews.refresh()]);
   } catch (error) {
     byId('applications-message').textContent = error.message;
   }
 }
 
 async function removeApplication(id) {
-  if (!window.confirm('Delete this application and its reminders?')) return;
+  if (!window.confirm('Delete this application, its interview rounds, and its reminders?')) return;
   try {
     await api(`/api/applications/${encodeURIComponent(id)}`, { method: 'DELETE' });
-    await Promise.all([loadApplications(), loadReminders()]);
+    interviews.reset();
+    await Promise.all([loadApplications(), loadReminders(), interviews.loadAgenda()]);
   } catch (error) {
     byId('applications-message').textContent = error.message;
   }
@@ -239,7 +243,7 @@ byId('auth-form').addEventListener('submit', async (event) => {
     state.token = token;
     sessionStorage.setItem('placement-token', token);
     setAuthenticated(true);
-    await Promise.all([loadApplications(), loadReminders(true)]);
+    await Promise.all([loadApplications(), loadReminders(true), interviews.loadAgenda()]);
   } catch (error) {
     byId('auth-message').textContent = error.message;
   }
@@ -248,6 +252,7 @@ byId('auth-form').addEventListener('submit', async (event) => {
 byId('logout-button').addEventListener('click', () => {
   state.token = null;
   state.applications = [];
+  interviews.reset();
   sessionStorage.removeItem('placement-token');
   setAuthenticated(false);
 });
@@ -267,7 +272,7 @@ byId('application-form').addEventListener('submit', async (event) => {
       values,
       createApplication: () => api(request.path, { method: request.method, body: request.body }),
       closeDialog: closeApplicationDialog,
-      refresh: () => Promise.all([loadApplications(), loadReminders(true)]),
+      refresh: () => Promise.all([loadApplications(), loadReminders(true), interviews.refresh()]),
     });
     const message = byId('applications-message');
     message.textContent = editing ? 'Application updated.' : 'Application added.';
@@ -286,8 +291,9 @@ byId('status-filter').addEventListener('change', loadApplications);
 byId('generate-reminders').addEventListener('click', () => loadReminders(true));
 
 setAuthenticated(Boolean(state.token));
-if (state.token) Promise.all([loadApplications(), loadReminders(true)]).catch(() => {
+if (state.token) Promise.all([loadApplications(), loadReminders(true), interviews.loadAgenda()]).catch(() => {
   sessionStorage.removeItem('placement-token');
   state.token = null;
+  interviews.reset();
   setAuthenticated(false);
 });

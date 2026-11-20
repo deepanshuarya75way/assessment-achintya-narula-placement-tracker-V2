@@ -139,7 +139,7 @@ export function createApplication(
   input: ApplicationInput,
   userId: string,
   now = new Date(),
-  id = crypto.randomUUID(),
+  id: string = crypto.randomUUID(),
 ): JobApplication {
   const timestamp = now.toISOString();
   return {

@@ -96,6 +96,27 @@ dialog::backdrop { background: rgba(23,33,43,.52); backdrop-filter: blur(3px); }
 .field-hint { margin: 0 0 15px; color: var(--muted); font-size: .76rem; line-height: 1.45; }
 .stage-date-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
 .dialog-actions { display: flex; justify-content: end; gap: 8px; }
+.agenda-panel { margin: 0 0 20px; padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+.agenda-panel > .field-hint { margin-top: 12px; }
+.agenda-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+.agenda-controls label { margin: 0; }
+.agenda-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+.agenda-item { display: grid; gap: 8px; padding: 17px; border: 1px solid var(--line); border-radius: 10px; overflow-wrap: anywhere; }
+.agenda-soon { border-left: 4px solid var(--blue); background: #f2f5ff; }
+.agenda-item time { color: var(--blue-dark); font-size: .8rem; font-weight: 750; }
+.agenda-item .field-hint { margin: 0; }
+.soon-badge { justify-self: start; font-size: .7rem; color: var(--blue-dark); background: #e0e8ff; border-radius: 20px; padding: 4px 8px; }
+.interview-dialog-content { padding: 27px; }
+.round-list { display: grid; gap: 14px; margin: 20px 0; }
+.round-card { padding: 18px; border: 1px solid var(--line); border-radius: 10px; background: white; overflow-wrap: anywhere; }
+.round-card h3 { margin: 0; font-size: 1rem; }
+.round-start { font-size: .85rem; line-height: 1.6; }
+.saved-note { white-space: pre-wrap; background: #f5f3ed; padding: 10px; border-radius: 6px; font-size: .85rem; }
+.round-feedback summary { cursor: pointer; color: var(--blue-dark); font-size: .85rem; font-weight: 750; }
+.feedback-form { margin-top: 18px; }
+.round-status { text-transform: uppercase; }
+.status-pill[data-status="PASSED"], .status-pill[data-status="COMPLETED"] { color: #17683b; background: #e8f7ef; }
+button:disabled { opacity: .55; cursor: wait; transform: none; }
 @media (max-width: 850px) {
   .auth-layout, .dashboard-grid { grid-template-columns: 1fr; }
   .auth-card { max-width: none; }
@@ -103,6 +124,11 @@ dialog::backdrop { background: rgba(23,33,43,.52); backdrop-filter: blur(3px); }
   .stats { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 560px) {
+  .agenda-panel .panel-heading { flex-direction: column; }
+  .agenda-controls { width: 100%; }
+  .agenda-controls label { flex: 1; }
+  .agenda-list { grid-template-columns: minmax(0, 1fr); }
+  .interview-dialog-content { padding: 18px; }
   main { width: min(100% - 24px, 1240px); }
   .auth-layout { padding: 36px 0; }
   .dashboard-heading { align-items: stretch; flex-direction: column; }

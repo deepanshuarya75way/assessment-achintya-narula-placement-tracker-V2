@@ -9,6 +9,20 @@ import { createInterviewRound, InterviewValidationError } from '../domain/interv
 import { buildInterviewCalendar } from '../domain/calendar.ts';
 import { JsonStore } from '../store/json-store.ts';
 
+function dateInIST(date: Date): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+
+  const get = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find((part) => part.type === type)?.value ?? '';
+
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
 interface ApiOptions {
   store: JsonStore;
   jwtSecret: string;
@@ -276,13 +290,16 @@ export function createApiServer(options: ApiOptions): Server {
         await readJson(request);
         const applications = await options.store.listApplications(claims.sub);
         const existing = await options.store.listReminders(claims.sub);
+        const currentTime = new Date();
+
         const due = buildDueReminders(
           applications,
           existing,
           claims.sub,
-          now().toISOString().slice(0, 10),
-          now(),
+          dateInIST(currentTime),
+          currentTime,
         );
+
         const reminders = await options.store.addReminders(due);
         json(response, 201, { reminders });
         return;

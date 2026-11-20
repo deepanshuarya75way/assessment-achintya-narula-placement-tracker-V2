@@ -9,11 +9,11 @@ export function setupInterviews({ api, getToken }) {
   let generation = 0;
   let agendaGeneration = 0;
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const dateFormatter = new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium', timeStyle: 'short',
+  const dateFormatter = new Intl.DateTimeFormat('en-IN', {
+    dateStyle: 'medium', timeStyle: 'short', timeZone: timezone,
   });
   for (const label of document.querySelectorAll('.timezone-label')) {
-    label.textContent = `Times shown in ${timezone} (your device timezone).`;
+    label.textContent = `Times shown in IST (Asia/Kolkata).`;
   }
   const roundPath = (applicationId, roundId = '') =>
     `/api/applications/${encodeURIComponent(applicationId)}/interviews${roundId ? `/${encodeURIComponent(roundId)}` : ''}`;

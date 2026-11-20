@@ -49,9 +49,21 @@ function selectMode(mode) {
   byId('auth-message').textContent = '';
 }
 
+function dateInIST(date = new Date()){
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+
+const get = (type) => parts.find((part) => part.type === type)?.value;
+return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
 function formatDate(value) {
   if (!value) return 'Not set';
-  return new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
+  return new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })
     .format(new Date(`${value}T00:00:00Z`));
 }
 
@@ -130,7 +142,7 @@ function renderApplications() {
   }
   for (const application of state.applications) {
     const card = byId('application-template').content.firstElementChild.cloneNode(true);
-    const presentation = applicationPresentation(application, new Date().toISOString().slice(0, 10));
+    const presentation = applicationPresentation(application, dateInIST());
     card.querySelector('.application-role').textContent = application.role;
     card.querySelector('.application-company').textContent = application.company;
     card.querySelector('.application-location').textContent = application.location || 'Remote / unspecified';

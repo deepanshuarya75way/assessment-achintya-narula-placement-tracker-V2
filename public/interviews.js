@@ -8,7 +8,7 @@ export function setupInterviews({ api, getToken }) {
   let editingRoundId = null;
   let generation = 0;
   let agendaGeneration = 0;
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const timezone = 'Asia/Kolkata';
   const dateFormatter = new Intl.DateTimeFormat('en-IN', {
     dateStyle: 'medium', timeStyle: 'short', timeZone: timezone,
   });
